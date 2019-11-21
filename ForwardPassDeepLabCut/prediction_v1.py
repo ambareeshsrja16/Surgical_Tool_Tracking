@@ -26,7 +26,7 @@ if __name__ == '__main__':
     # Clone arguments to deeplabcut.evaluate_network
     ##################################################
 
-    config = "C:/Users/asree/PycharmProjects/ForwardPassDeepLabCut/DaVinci-Ambar-2019-10-31/config.yaml"
+    config = "/root/DLCROS_ws/Surgical_Tool_Tracking/ForwardPassDeepLabCut/DaVinci-Ambar-2019-10-31/config.yaml"
     Shuffles = [1]
     plotting = None
     show_errors = True
