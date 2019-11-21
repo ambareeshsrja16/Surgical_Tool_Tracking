@@ -163,7 +163,8 @@ if __name__ == '__main__':
         while image_arrived:
             # DIKEO
             # Equivalent of below line, but from a port/ROS node
-            image = io.imread(imagename, mode='RGB')
+            #image = io.imread(imagename, mode='RGB')
+            image = io.imread(imagename, plugin='matplotlib')
 
             ##################################################
             # Once image arrives,call the function that uses the setup to predict and return 10*3 nd.array
