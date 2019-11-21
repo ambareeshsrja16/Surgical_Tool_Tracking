@@ -155,7 +155,7 @@ if __name__ == '__main__':
 
         image_arrived = True
         # dikeo
-        imagename = "img034.PNG"
+        imagename = "img034.png"
 
         count = 0
         init = time.time()
