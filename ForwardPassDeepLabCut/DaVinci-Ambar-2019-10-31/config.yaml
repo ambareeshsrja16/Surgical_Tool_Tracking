@@ -4,11 +4,11 @@ scorer: Ambar
 date: Oct31
 
 # Project path (change when moving around)
-project_path: C:\Users\asree\PycharmProjects\ForwardPassDeepLabCut\DaVinci-Ambar-2019-10-31
+project_path: /root/DLCROS_ws/Surgical_Tool_Tracking/ForwardPassDeepLabCut/DaVinci-Ambar-2019-10-31
 
 # Annotation data set configuration (and individual video cropping parameters)
 video_sets:
-  C:\Users\asree\PycharmProjects\ForwardPassDeepLabCut\DaVinci-Ambar-2019-10-31\videos\video_1.avi:
+  /root/DLCROS_ws/Surgical_Tool_Tracking/ForwardPassDeepLabCut/DaVinci-Ambar-2019-10-31/videos/video_1.avi:
     crop: 0, 1440, 0, 576
 bodyparts:
 - left_shaft_right_tip
