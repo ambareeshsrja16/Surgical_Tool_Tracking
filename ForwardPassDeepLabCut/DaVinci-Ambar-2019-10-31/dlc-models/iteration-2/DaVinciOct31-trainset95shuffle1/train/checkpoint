@@ -1,0 +1,2 @@
+model_checkpoint_path: "C:\\Users\\asree\\PycharmProjects\\ForwardPassDeepLabCut\\DaVinci-Ambar-2019-10-31\\dlc-models\\iteration-2\\DaVinciOct31-trainset95shuffle1\\train\\snapshot-100"
+all_model_checkpoint_paths: "C:\\Users\\asree\\PycharmProjects\\ForwardPassDeepLabCut\\DaVinci-Ambar-2019-10-31\\dlc-models\\iteration-2\\DaVinciOct31-trainset95shuffle1\\train\\snapshot-100"

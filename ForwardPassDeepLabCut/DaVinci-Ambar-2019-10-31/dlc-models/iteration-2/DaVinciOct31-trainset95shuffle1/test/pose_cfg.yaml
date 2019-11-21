@@ -1,0 +1,30 @@
+all_joints:
+- - 0
+- - 1
+- - 2
+- - 3
+- - 4
+- - 5
+- - 6
+- - 7
+- - 8
+- - 9
+all_joints_names:
+- left_shaft_right_tip
+- left_logobody_right_tip
+- left_logobody_head_tip
+- right_shaft_left_tip
+- right_logobody_left_tip
+- right_logobody_head_tip
+- left_arm_left_jaw_edge
+- left_arm_right_jaw_centre
+- right_arm_right_jaw_edge
+- right_arm_left_jaw_centre
+dataset: training-datasets\iteration-2\UnaugmentedDataSet_DaVinciOct31\DaVinci_Ambar95shuffle1.mat
+global_scale: 0.8
+init_weights: C:\Users\asree\Anaconda3\envs\dlc-windowsGPU\lib\site-packages\deeplabcut\pose_estimation_tensorflow\models\pretrained\resnet_v1_50.ckpt
+location_refinement: true
+locref_stdev: 7.2801
+net_type: resnet_50
+num_joints: 10
+scoremap_dir: test

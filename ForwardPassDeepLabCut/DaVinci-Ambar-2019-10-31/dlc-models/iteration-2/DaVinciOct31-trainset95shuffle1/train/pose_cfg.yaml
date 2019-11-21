@@ -1,0 +1,59 @@
+all_joints:
+- - 0
+- - 1
+- - 2
+- - 3
+- - 4
+- - 5
+- - 6
+- - 7
+- - 8
+- - 9
+all_joints_names:
+- left_shaft_right_tip
+- left_logobody_right_tip
+- left_logobody_head_tip
+- right_shaft_left_tip
+- right_logobody_left_tip
+- right_logobody_head_tip
+- left_arm_left_jaw_edge
+- left_arm_right_jaw_centre
+- right_arm_right_jaw_edge
+- right_arm_left_jaw_centre
+bottomheight: 400
+crop: true
+cropratio: 0.4
+dataset: training-datasets\iteration-2\UnaugmentedDataSet_DaVinciOct31\DaVinci_Ambar95shuffle1.mat
+display_iters: 20
+global_scale: 0.8
+init_weights: C:\Users\asree\Anaconda3\envs\dlc-windowsGPU\lib\site-packages\deeplabcut\pose_estimation_tensorflow\models\pretrained\resnet_v1_50.ckpt
+intermediate_supervision: false
+intermediate_supervision_layer: 12
+leftwidth: 400
+location_refinement: true
+locref_huber_loss: true
+locref_loss_weight: 0.05
+locref_stdev: 7.2801
+max_input_size: 1500
+metadataset: training-datasets\iteration-2\UnaugmentedDataSet_DaVinciOct31\Documentation_data-DaVinci_95shuffle1.pickle
+min_input_size: 64
+minsize: 100
+mirror: false
+multi_step:
+- - 0.005
+  - 10000
+- - 0.02
+  - 430000
+- - 0.002
+  - 730000
+- - 0.001
+  - 1030000
+net_type: resnet_50
+num_joints: 10
+pos_dist_thresh: 17
+project_path: C:\Users\asree\PycharmProjects\ForwardPassDeepLabCut\DaVinci-Ambar-2019-10-31
+rightwidth: 400
+save_iters: 100
+scale_jitter_lo: 0.5
+scale_jitter_up: 1.25
+topheight: 400

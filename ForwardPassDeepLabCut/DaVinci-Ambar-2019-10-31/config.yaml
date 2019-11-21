@@ -1,0 +1,66 @@
+# Project definitions (do not edit)
+Task: DaVinci
+scorer: Ambar
+date: Oct31
+
+# Project path (change when moving around)
+project_path: C:\Users\asree\PycharmProjects\ForwardPassDeepLabCut\DaVinci-Ambar-2019-10-31
+
+# Annotation data set configuration (and individual video cropping parameters)
+video_sets:
+  C:\Users\asree\PycharmProjects\ForwardPassDeepLabCut\DaVinci-Ambar-2019-10-31\videos\video_1.avi:
+    crop: 0, 1440, 0, 576
+bodyparts:
+- left_shaft_right_tip
+- left_logobody_right_tip
+- left_logobody_head_tip
+- right_shaft_left_tip
+- right_logobody_left_tip
+- right_logobody_head_tip
+- left_arm_left_jaw_edge
+- left_arm_right_jaw_centre
+- right_arm_right_jaw_edge
+- right_arm_left_jaw_centre
+start: 0
+stop: 1
+numframes2pick: 20
+
+# Plotting configuration
+skeleton:
+- - left_shaft_right_tip
+- - left_logobody_right_tip
+- - left_logobody_head_tip
+- - right_shaft_left_tip
+- - right_logobody_left_tip
+- - right_logobody_head_tip
+- - left_arm_left_jaw_edge
+- - left_arm_right_jaw_centre
+- - right_arm_right_jaw_edge
+- - right_arm_left_jaw_centre
+skeleton_color: black
+pcutoff: 0.1
+dotsize: 12
+alphavalue: 0.7
+colormap: jet
+
+# Training,Evaluation and Analysis configuration
+TrainingFraction:
+- 0.95
+iteration: 2
+resnet: 50
+snapshotindex: -1
+batch_size: 8
+
+# Cropping Parameters (for analysis and outlier frame detection)
+cropping: false
+#if cropping is true for analysis, then set the values here:
+x1: 0
+x2: 640
+y1: 277
+y2: 624
+
+# Refinement configuration (parameters from annotation dataset configuration also relevant in this stage)
+corner2move2:
+- 50
+- 50
+move2corner: true
