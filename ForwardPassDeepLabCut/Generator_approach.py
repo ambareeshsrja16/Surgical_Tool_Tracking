@@ -11,7 +11,6 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 
 
-import time
 import os
 from skimage import io
 import skimage.color
@@ -23,9 +22,8 @@ from deeplabcut.utils import auxiliaryfunctions, visualization
 import tensorflow as tf
 
 from pathlib import Path
-
 import numpy as np
-
+import time
 
 def predict_single_image(image, sess, inputs, outputs, dlc_cfg):
     """
@@ -49,15 +47,14 @@ def predict_single_image(image, sess, inputs, outputs, dlc_cfg):
 
 def generate_prediction(MAX_PREDICTION_STEPS = 1000):
     """
-    Generartor for predicting image
-    MAX_PREDICTION_STEPS : Number of predictions done 
+    Generator for predicting image
+    MAX_PREDICTION_STEPS : Number of predictions that should be done before re-initializing 
 
     """
 
     ##################################################
-    # Clone arguments to deeplabcut.evaluate_network
+    # Clone arguments from deeplabcut.evaluate_network
     ##################################################
-
     config = "/root/DLCROS_ws/Surgical_Tool_Tracking/ForwardPassDeepLabCut/DaVinci-Ambar-2019-10-31/config.yaml"
     Shuffles = [1]
     plotting = None
@@ -68,26 +65,12 @@ def generate_prediction(MAX_PREDICTION_STEPS = 1000):
     # Suppress scientific notation while printing
     np.set_printoptions(suppress=True)
 
-    # Check time stamp differences between events
-    import time
-
 
     ##################################################
     # SETUP everything until image prediction
     ##################################################
-
     # Clone evaluate_network
-    import os
-    from skimage import io
-    import skimage.color
 
-    from deeplabcut.pose_estimation_tensorflow.nnet import predict as ptf_predict
-    from deeplabcut.pose_estimation_tensorflow.config import load_config
-    from deeplabcut.pose_estimation_tensorflow.dataset.pose_dataset import data_to_input
-    from deeplabcut.utils import auxiliaryfunctions, visualization
-    import tensorflow as tf
-
-    from pathlib import Path
 
     if 'TF_CUDNN_USE_AUTOTUNE' in os.environ:
         del os.environ['TF_CUDNN_USE_AUTOTUNE']  # was potentially set during training
@@ -100,10 +83,11 @@ def generate_prediction(MAX_PREDICTION_STEPS = 1000):
 
     TF.reset_default_graph()
 
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  #
-    #    tf.logging.set_verbosity(tf.logging.WARN)
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+    #tf.logging.set_verbosity(tf.logging.WARN)
 
     start_path = os.getcwd()
+
     # Read file path for pose_config file. >> pass it on
     cfg = auxiliaryfunctions.read_config(config)
     if gputouse is not None:  # gpu selectinon
@@ -162,6 +146,7 @@ def generate_prediction(MAX_PREDICTION_STEPS = 1000):
     ##################################################
     # Compute predictions over image
     ##################################################
+
     for snapindex in snapindices:
         dlc_cfg['init_weights'] = os.path.join(str(modelfolder), 'train',
                                                Snapshots[snapindex])  # setting weights to corresponding snapshot.
@@ -179,37 +164,29 @@ def generate_prediction(MAX_PREDICTION_STEPS = 1000):
         # sess, inputs, outputs = ptf_predict.setup_GPUpose_prediction(dlc_cfg)
 
         print("Analyzing test image ...")
-
         imagename = "img034.png"
-        count = 0
         image = io.imread(imagename, plugin='matplotlib')
 
+        count = 0
+
         while count < MAX_PREDICTION_STEPS:
-            
-            # TODO
-            # Equivalent of below line, but from a port/ROS node
-            #image = io.imread(imagename, mode='RGB')
-            
 
             ##################################################
-            # Once image arrives,call the function that uses the setup to predict and return 10*3 nd.array
+            # Predict for test image once, and wait for future images to arrive
             ##################################################
             
             print("Calling predict_single_image")
             pose = predict_single_image(image, sess, inputs, outputs, dlc_cfg)
 
             ##################################################
-            # Send prediction to output stream
+            # Yield prediction to caller
             ##################################################
-
-            #CAN ALSO RECEIVE IMAGE HERE!!!
-            image = (yield pose)
+            
+            image = (yield pose) # Receive image here ( Refer https://stackabuse.com/python-generators/ for sending/receiving in generators)
             count += 1
 
-            # dikeo
             if count == MAX_PREDICTION_STEPS:
                 print(f"Restart prediction system, Steps have exceeded {MAX_PREDICTION_STEPS}")
-
 
         sess.close()  # closes the current tf session
         TF.reset_default_graph()
