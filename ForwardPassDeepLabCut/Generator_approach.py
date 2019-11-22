@@ -1,3 +1,16 @@
+#!/usr/bin/env python
+from __future__ import print_function
+
+import roslib
+roslib.load_manifest('my_package')
+import sys
+import rospy
+import cv2
+from std_msgs.msg import String
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
+
+
 import time
 import os
 from skimage import io
@@ -34,9 +47,11 @@ def predict_single_image(image, sess, inputs, outputs, dlc_cfg):
     return pose
 
 
-def generate_prediction():
+def generate_prediction(MAX_PREDICTION_STEPS = 1000):
     """
     Generartor for predicting image
+    MAX_PREDICTION_STEPS : Number of predictions done 
+
     """
 
     ##################################################
@@ -150,8 +165,7 @@ def generate_prediction():
     for snapindex in snapindices:
         dlc_cfg['init_weights'] = os.path.join(str(modelfolder), 'train',
                                                Snapshots[snapindex])  # setting weights to corresponding snapshot.
-        trainingsiterations = (dlc_cfg['init_weights'].split(os.sep)[-1]).split('-')[
-            -1]  # read how many training siterations that corresponds to.
+        trainingsiterations = (dlc_cfg['init_weights'].split(os.sep)[-1]).split('-')[-1]  # read how many training siterations that corresponds to.
 
         # name for deeplabcut net (based on its parameters)
         DLCscorer = auxiliaryfunctions.GetScorerName(cfg, shuffle, trainFraction, trainingsiterations)
@@ -164,51 +178,89 @@ def generate_prediction():
         # Specifying state of model (snapshot / training state)
         # sess, inputs, outputs = ptf_predict.setup_GPUpose_prediction(dlc_cfg)
 
-        print("Analyzing image...")
+        print("Analyzing test image ...")
 
-        ##################################################
-        # Wait for image to arrive
-        ##################################################
-
-        image_arrived = True
-        
-        # dikeo
         imagename = "img034.png"
-
         count = 0
-        init = time.time()
-        start = time.time()
-        while image_arrived:
-            # DIKEO
+        image = io.imread(imagename, plugin='matplotlib')
+
+        while count < MAX_PREDICTION_STEPS:
+            
+            # TODO
             # Equivalent of below line, but from a port/ROS node
             #image = io.imread(imagename, mode='RGB')
-            image = io.imread(imagename, plugin='matplotlib')
+            
 
             ##################################################
             # Once image arrives,call the function that uses the setup to predict and return 10*3 nd.array
             ##################################################
-            # DEBUG
-            print("Calling predict_single image")
+            
+            print("Calling predict_single_image")
             pose = predict_single_image(image, sess, inputs, outputs, dlc_cfg)
 
             ##################################################
             # Send prediction to output stream
             ##################################################
 
-            if not count:
-                print("Pose: image 1")
-                print("\n",pose)
-
-            done = time.time()
-            print(f"pose evaluated for image {count+1}, took {done-start} seconds")
-            start = done
+            #CAN ALSO RECEIVE IMAGE HERE!!!
+            image = (yield pose)
             count += 1
 
-
             # dikeo
-            if count > 100:
-                print(f"Took {(done-init):.2f} seconds to print {count} images)")
-                break
+            if count == MAX_PREDICTION_STEPS:
+                print(f"Restart prediction system, Steps have exceeded {MAX_PREDICTION_STEPS}")
+
+
         sess.close()  # closes the current tf session
         TF.reset_default_graph()
+
+
+
+class image_converter:
+
+  def __init__(self):
+    self.image_pub = rospy.Publisher("image_topic_2", Image)
+    self.bridge = CvBridge()
+    self.image_sub = rospy.Subscriber("image_topic", Image, self.callback)
+
+  def callback(self,data):
+    try:
+      cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+    except CvBridgeError as e:
+      print(e)
+
+    # Generator approach
+    points_predicted = generator.send(cv_image)
+    # USE this points_predicted
+
+    #print(points_predicted)
+
+    # PUBLISH 
+    try:
+      self.image_pub.publish(self.bridge.cv2_to_imgmsg(predicted_image, "bgr8"))
+    except CvBridgeError as e:
+      print(e)
+
+
+def main(args):
+  
+  ic = image_converter()
+  rospy.init_node('image_converter', anonymous=True)
+
+  MAX_PREDICTION_STEPS = 1000
+  generator = generate_prediction(MAX_PREDICTION_STEPS)
+  # Kickstart generator to test the first saved image
+  points_predicted = generator.send(None)
+
+  print(f"First prediction: {points_predicted}")
+
+  try:
+    rospy.spin()
+  except KeyboardInterrupt:
+    print("Shutting down")
+  #cv2.destroyAllWindows()
+
+if __name__ == '__main__':
+
+    main(sys.argv)
 
