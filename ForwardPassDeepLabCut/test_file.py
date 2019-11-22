@@ -11,5 +11,5 @@ if __name__ == '__main__':
     # path_config_file = '/home/Mackenzie/Reaching/config.yaml' # Enter the path of the config file that was just created from the above step (check the folder)
     # deeplabcut.create_training_dataset(path_config_file)
 
-    path_config_file = "C:/Users/asree/PycharmProjects/ForwardPassDeepLabCut/DaVinci-Ambar-2019-10-31/config.yaml"
+    path_config_file = "/root/DLCROS_ws/Surgical_Tool_Tracking/ForwardPassDeepLabCut/DaVinci-Ambar-2019-10-31/config.yaml"
     deeplabcut.evaluate_network(path_config_file, plotting=True)
