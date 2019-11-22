@@ -196,9 +196,9 @@ def generate_prediction(MAX_PREDICTION_STEPS = 1000):
 class image_converter:
 
   def __init__(self):
-    self.image_pub = rospy.Publisher("image_topic_2", Image)
+    # self.image_pub = rospy.Publisher("image_topic_2", Image)
     self.bridge = CvBridge()
-    self.image_sub = rospy.Subscriber("image_topic", Image, self.callback)
+    self.image_sub = rospy.Subscriber("/stereo/slave/left/image", Image, self.callback)
 
   def callback(self,data):
     try:
@@ -210,13 +210,14 @@ class image_converter:
     points_predicted = generator.send(cv_image)
     # USE this points_predicted
 
-    #print(points_predicted)
+    print("Points")
+    print(points_predicted)
 
-    # PUBLISH 
-    try:
-      self.image_pub.publish(self.bridge.cv2_to_imgmsg(predicted_image, "bgr8"))
-    except CvBridgeError as e:
-      print(e)
+    # # PUBLISH 
+    # try:
+    #   self.image_pub.publish(self.bridge.cv2_to_imgmsg(predicted_image, "bgr8"))
+    # except CvBridgeError as e:
+    #   print(e)
 
 
 def main(args):
