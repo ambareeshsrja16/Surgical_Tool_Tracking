@@ -1,0 +1,291 @@
+#!/usr/bin/env python
+from __future__ import print_function
+
+import roslib
+import sys
+import rospy
+import cv2
+from std_msgs.msg import String
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
+
+import os
+from skimage import io
+from skimage.transform import resize
+import skimage.color
+from skimage.util import img_as_ubyte
+
+from deeplabcut.pose_estimation_tensorflow.nnet import predict as ptf_predict
+from deeplabcut.pose_estimation_tensorflow.config import load_config
+from deeplabcut.pose_estimation_tensorflow.dataset.pose_dataset import data_to_input
+from deeplabcut.utils import auxiliaryfunctions, visualization
+import tensorflow as tf
+
+from pathlib import Path
+import numpy as np
+import time
+import copy
+
+#Change this, add this as parameter to predict_single_image
+REQUIRED_DIM = (960, 540)
+
+def predict_single_image(image, sess, inputs, outputs, dlc_cfg):
+    """
+    Returns pose for one single image
+    :param image:
+    :return:
+    """
+    # The size here should be the size of the images on which your CNN was trained on
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = img_as_ubyte(image)
+    pose = ptf_predict.getpose(image, dlc_cfg, sess, inputs, outputs)
+    return pose
+
+    
+def generate_prediction(MAX_PREDICTION_STEPS = 1000):
+    """
+    Generator for predicting image
+    MAX_PREDICTION_STEPS : Number of predictions that should be done before re-initializing 
+
+    """
+
+    ##################################################
+    # Clone arguments from deeplabcut.evaluate_network
+    ##################################################
+
+    config = "/root/DLCROS_ws/Surgical_Tool_Tracking/ForwardPassDeepLabCut/test-jingpei-2020-01-09/config.yaml"
+    Shuffles = [1]
+    plotting = None
+    show_errors = True
+    comparisonbodyparts = "all"
+    gputouse = None
+    use_gpu = False
+
+    # Suppress scientific notation while printing
+    np.set_printoptions(suppress=True)
+
+
+    ##################################################
+    # SETUP everything until image prediction
+    ##################################################
+
+    if 'TF_CUDNN_USE_AUTOTUNE' in os.environ:
+        del os.environ['TF_CUDNN_USE_AUTOTUNE']  # was potentially set during training
+
+    vers = tf.__version__.split('.')
+    if int(vers[0]) == 1 and int(vers[1]) > 12:
+        TF = tf.compat.v1
+    else:
+        TF = tf
+
+    TF.reset_default_graph()
+
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+    #tf.logging.set_verbosity(tf.logging.WARN)
+
+    start_path = os.getcwd()
+
+    # Read file path for pose_config file. >> pass it on
+    cfg = auxiliaryfunctions.read_config(config)
+    if gputouse is not None:  # gpu selectinon
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(gputouse)
+
+    ##############
+    # Cloning for-loop variables
+    shuffle = Shuffles[0]
+    trainFraction = cfg["TrainingFraction"][0]
+    ##############
+
+    trainingsetfolder = auxiliaryfunctions.GetTrainingSetFolder(cfg)
+    # Get list of body parts to evaluate network for
+    comparisonbodyparts = auxiliaryfunctions.IntersectionofBodyPartsandOnesGivenbyUser(cfg, comparisonbodyparts)
+
+    ##################################################
+    # Load and setup CNN part detector
+    ##################################################
+
+    modelfolder = os.path.join(cfg["project_path"], str(auxiliaryfunctions.GetModelFolder(trainFraction, shuffle, cfg)))
+    path_test_config = Path(modelfolder) / 'test' / 'pose_cfg.yaml'
+    # Load meta data
+    # data, trainIndices, testIndices, trainFraction = auxiliaryfunctions.LoadMetadata(
+    #     os.path.join(cfg["project_path"], metadatafn))
+
+    try:
+        dlc_cfg = load_config(str(path_test_config))
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            "It seems the model for shuffle s and trainFraction %s does not exist.")
+
+    dlc_cfg['batch_size'] = 1  # in case this was edited for analysis.
+
+    # Check which snapshots are available and sort them by # iterations
+    Snapshots = np.array(
+        [fn.split('.')[0] for fn in os.listdir(os.path.join(str(modelfolder), 'train')) if "index" in fn])
+    try:  # check if any where found?
+        Snapshots[0]
+    except IndexError:
+        raise FileNotFoundError(
+            "Snapshots not found! It seems the dataset for shuffle and "
+            "trainFraction is not trained.\nPlease train it before evaluating."
+            "\nUse the function 'train_network' to do so.")
+
+    increasing_indices = np.argsort([int(m.split('-')[1]) for m in Snapshots])
+    Snapshots = Snapshots[increasing_indices]
+
+    if cfg["snapshotindex"] == -1:
+        snapindices = [-1]
+    elif cfg["snapshotindex"] == "all":
+        snapindices = range(len(Snapshots))
+    elif cfg["snapshotindex"] < len(Snapshots):
+        snapindices = [cfg["snapshotindex"]]
+    else:
+        print("Invalid choice, only -1 (last), any integer up to last, or all (as string)!")
+
+    ##################################################
+    # Compute predictions over image
+    ##################################################
+
+    for snapindex in snapindices:
+        dlc_cfg['init_weights'] = os.path.join(str(modelfolder), 'train',
+                                               Snapshots[snapindex])  # setting weights to corresponding snapshot.
+        trainingsiterations = (dlc_cfg['init_weights'].split(os.sep)[-1]).split('-')[-1]  # read how many training siterations that corresponds to.
+
+        # name for deeplabcut net (based on its parameters)
+        DLCscorer = auxiliaryfunctions.GetScorerName(cfg, shuffle, trainFraction, trainingsiterations)
+        print("Running ", DLCscorer, " with # of trainingiterations:", trainingsiterations)
+
+
+        # Using GPU for prediction
+        # Specifying state of model (snapshot / training state)
+        if use_gpu:
+            sess, inputs, outputs = ptf_predict.setup_GPUpose_prediction(dlc_cfg)
+            pose_tensor = ptf_predict.extract_GPUprediction(outputs, dlc_cfg)
+        else:
+            sess, inputs, outputs = ptf_predict.setup_pose_prediction(dlc_cfg)
+
+        print("Analyzing test image ...")
+        imagename = "img100_960_540.png"
+        image = io.imread(imagename, plugin='matplotlib')
+	
+        count = 0
+        start_time = time.time()
+        while count < MAX_PREDICTION_STEPS:
+
+            ##################################################
+            # Predict for test image once, and wait for future images to arrive
+            ##################################################
+            
+            print("Calling predict_single_image")
+            if use_gpu:       
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                image = img_as_ubyte(image)
+                pose = sess.run(pose_tensor, feed_dict={inputs: np.expand_dims(image, axis=0).astype(float)})
+                pose[:, [0,1,2]] = pose[:, [1,0,2]]
+            else:
+                pose = predict_single_image(image, sess, inputs, outputs, dlc_cfg)
+
+
+            #print(pose)
+            ##################################################
+            # Yield prediction to caller
+            ##################################################
+          
+            image = (yield pose) # Receive image here ( Refer https://stackabuse.com/python-generators/ for sending/receiving in generators)
+            
+            #step_time = time.time()
+            #start_time = step_time
+            count += 1
+
+            if count == MAX_PREDICTION_STEPS:
+                print(f"Restart prediction system, Steps have exceeded {MAX_PREDICTION_STEPS}")
+
+        sess.close()  # closes the current tf session
+        TF.reset_default_graph()
+
+
+
+class image_converter:
+
+  def __init__(self, generator):
+    self.image_pub = rospy.Publisher("/dlc_prediction_topic", Image)
+    self.bridge = CvBridge()
+    self.image_sub = rospy.Subscriber("/stereo/slave/left/image", Image, self.callback)
+    self.generator = generator
+
+  def callback(self,data):
+    try:
+      self.cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+      #temp_image = copy.deepcopy(self.cv_image)
+      temp_image = cv2.resize(self.cv_image, REQUIRED_DIM)
+    except CvBridgeError as e:
+      print(e)
+
+    # Generator approach
+    try:
+      results = self.generator.send(temp_image)
+      points_predicted = results[:,:2]
+      scores = results[:,2]
+      #pass     
+    except ValueError as e:
+        if str(e) == 'generator already executing':
+           print("Prediction ongoing, returning previous image")
+           return 
+
+    #points_predicted =  self.modify_points_predicted(points_predicted)
+
+    temp_pub_img = self.overwrite_image(temp_image,points_predicted,scores) 
+    # PUBLISH 
+    try:
+      self.image_pub.publish(self.bridge.cv2_to_imgmsg(temp_pub_img, "bgr8"))
+    except CvBridgeError as e:
+      print(e)
+  
+  def modify_points_predicted(self,points_predicted):
+    """Modify each point predicted to convert it back from the predicted size to the original
+       size of the image that came from ROS node"""
+    
+    MODIFYING_SCALE = 2
+    points_predicted[:,0] *= MODIFYING_SCALE
+    points_predicted[:,1] *= MODIFYING_SCALE  # After cropping the image was halved, so doubling it back up!
+    return points_predicted
+
+  def overwrite_image(self,image, points_predicted,scores):
+    """For each point in points_predicted make four corners and overwrite those 4 points in the cv_image with blue markers"""
+
+    # TODO: Separate this to another function
+    height, width = image.shape[:2]
+
+    #Clipping points so that they don't fall outside the image size
+    #points_predicted[:,0] = points_predicted[:,0].clip(0, height-1)
+    #points_predicted[:,1] = points_predicted[:,1].clip(0, width-1)
+
+    points_predicted = points_predicted.astype(int)
+
+    # Printing as a circle
+    for i in range(len(points_predicted)):
+        #print(points)
+        points = points_predicted[i]
+        image = cv2.circle(image,tuple(points), 10, (0,0,255), -1)
+        image = cv2.putText(image, str(round(scores[i],3)), tuple(points), cv2.FONT_HERSHEY_SIMPLEX,0.5, (0,0,255), 1, cv2.LINE_AA)  
+    return image
+
+
+def main(args):
+  MAX_PREDICTION_STEPS = int(1e5)
+  REQUIRED_DIM = (960, 540)
+
+  # Initialize and kickstart generator to test the first saved image
+  generator = generate_prediction(MAX_PREDICTION_STEPS)
+  points_predicted = generator.send(None)
+  print(f"First prediction: {points_predicted}")
+
+  ic = image_converter(generator)
+  rospy.init_node('image_converter', anonymous=True)
+
+  try:
+    rospy.spin()
+  except KeyboardInterrupt:
+    print("Shutting down")
+
+if __name__ == '__main__':
+    main(sys.argv)
