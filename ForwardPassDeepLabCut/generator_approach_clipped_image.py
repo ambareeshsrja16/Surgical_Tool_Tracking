@@ -8,6 +8,8 @@ import cv2
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
+from geometry_msgs.msg import Pose
+from geometry_msgs.msg import PoseArray
 
 import os
 from skimage import io
@@ -53,7 +55,7 @@ def generate_prediction(MAX_PREDICTION_STEPS = 1000):
     # Clone arguments from deeplabcut.evaluate_network
     ##################################################
 
-    config = "/root/DLCROS_ws/Surgical_Tool_Tracking/ForwardPassDeepLabCut/test-jingpei-2020-01-09/config.yaml"
+    config = "/root/DLCROS_ws/src/Surgical_Tool_Tracking/ForwardPassDeepLabCut/test-jingpei-2020-01-09/config.yaml"
     Shuffles = [1]
     plotting = None
     show_errors = True
@@ -164,7 +166,7 @@ def generate_prediction(MAX_PREDICTION_STEPS = 1000):
             sess, inputs, outputs = ptf_predict.setup_pose_prediction(dlc_cfg)
 
         print("Analyzing test image ...")
-        imagename = "img100_960_540.png"
+        imagename = "img034.png"
         image = io.imread(imagename, plugin='matplotlib')
 	
         count = 0
@@ -211,6 +213,7 @@ class image_converter:
     self.bridge = CvBridge()
     self.image_sub = rospy.Subscriber("/stereo/slave/left/image", Image, self.callback)
     self.generator = generator
+    self.pose_pub = rospy.Publisher("/dlc_pose_array", PoseArray)
 
   def callback(self,data):
     try:
@@ -232,9 +235,21 @@ class image_converter:
            return 
 
     #points_predicted =  self.modify_points_predicted(points_predicted)
+    # convert prediction to ros pose array
+    ps = PoseArray()
+    ps.header.frame_id = "/base_link"
+    ps.header.stamp = data.header.stamp
+    for i in range(points_predicted.shape[0]):
+       pose = Pose()
+       pose.position.x = points_predicted[i,0]
+       pose.position.y = points_predicted[i,1]
+       pose.position.z = scores[i]
+       ps.poses.append( pose )
+    
 
     temp_pub_img = self.overwrite_image(temp_image,points_predicted,scores) 
     # PUBLISH 
+    self.pose_pub.publish(ps)
     try:
       self.image_pub.publish(self.bridge.cv2_to_imgmsg(temp_pub_img, "bgr8"))
     except CvBridgeError as e:
