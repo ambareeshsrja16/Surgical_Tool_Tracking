@@ -10,6 +10,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from geometry_msgs.msg import Pose
 from geometry_msgs.msg import PoseArray
+from sensor_msgs.msg import JointState
 
 import os
 from skimage import io
@@ -213,7 +214,7 @@ class image_converter:
     self.bridge = CvBridge()
     self.image_sub = rospy.Subscriber("/stereo/slave/left/image", Image, self.callback)
     self.generator = generator
-    self.pose_pub = rospy.Publisher("/dlc_pose_array", PoseArray)
+    self.pose_pub = rospy.Publisher("/dlc_pose_array", JointState)
 
   def callback(self,data):
     try:
@@ -236,17 +237,24 @@ class image_converter:
 
     #points_predicted =  self.modify_points_predicted(points_predicted)
     # convert prediction to ros pose array
-    ps = PoseArray()
-    ps.header.frame_id = "/base_link"
-    ps.header.stamp = data.header.stamp
-    for i in range(points_predicted.shape[0]):
-       pose = Pose()
-       pose.position.x = points_predicted[i,0]
-       pose.position.y = points_predicted[i,1]
-       pose.position.z = scores[i]
-       ps.poses.append( pose )
-    
+#     ps = PoseArray()
+#     ps.header.frame_id = "/base_link"
+#     ps.header.stamp = data.header.stamp
+#     for i in range(points_predicted.shape[0]):
+#        pose = Pose()
+#        pose.position.x = points_predicted[i,0]
+#        pose.position.y = points_predicted[i,1]
+#        pose.position.z = scores[i]
+#        ps.poses.append( pose )
 
+    # convert prediction to ros pose array
+    ps = JointState()
+    ps.header.stamp = data.header.stamp
+    # right_shaft_up, right_shaft_tip, right_logo_body_up, right_logo_body_tail_tip, right_logo_body_head_tip, right_arm_right_jaw_edge, right_arm_left_jaw_center
+    ps.name = ['roll_1', 'roll_2', 'pitch_1', 'pitch_3', 'pitch_2','yaw_1','yaw_2']
+    ps.position = list(points_predicted[:,0]) # x coordinates
+    ps.velocity = list(points_predicted[:,1]) # y coordinates
+    
     temp_pub_img = self.overwrite_image(temp_image,points_predicted,scores) 
     # PUBLISH 
     self.pose_pub.publish(ps)
