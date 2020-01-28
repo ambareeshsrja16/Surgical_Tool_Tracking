@@ -259,7 +259,9 @@ class image_converter:
     # PUBLISH 
     self.pose_pub.publish(ps)
     try:
-      self.image_pub.publish(self.bridge.cv2_to_imgmsg(temp_pub_img, "bgr8"))
+      image_message = self.bridge.cv2_to_imgmsg(temp_pub_img, "bgr8")
+      image_message.header.stamp = data.header.stamp
+      self.image_pub.publish(image_message)
     except CvBridgeError as e:
       print(e)
   
