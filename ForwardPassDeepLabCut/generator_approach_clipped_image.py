@@ -32,6 +32,42 @@ import copy
 #Change this, add this as parameter to predict_single_image
 REQUIRED_DIM = (960, 540)
 
+mtx1 = np.array([ 1.6435516401714499e+03, 0., 8.3384217485027705e+02, 0.,
+       1.6328119551437901e+03, 6.5798955473076103e+02, 0., 0., 1. ]).reshape(3,3)
+mtx2 = np.array([ 1.6357791523747801e+03, 0., 1.0582548799154199e+03, 0.,
+       1.6311267811675500e+03, 6.9498544397877299e+02, 0., 0., 1. ]).reshape(3,3)
+dist1 = np.array([ -4.0444238705587998e-01, 5.8161897902897197e-01,
+       -4.9797819387316098e-03, 2.3217574337593299e-03,
+       -2.1547479006608700e-01 ]).reshape(1,5)
+dist2 = np.array([ -3.8302513378506597e-01, 4.9543625558184001e-01,
+       -2.5114323169358401e-03, 2.5401313005615298e-03,
+       -5.0514540202738802e-02 ]).reshape(1,5)
+R = np.array([ 9.9988655015587802e-01, -1.3038892445588000e-03,
+       -1.5006221716835100e-02, 1.1194501778253401e-03,
+       9.9992381548150500e-01, -1.2292683360820700e-02,
+       1.5021106772680100e-02, 1.2274490040240201e-02,
+       9.9981183391955097e-01 ]).reshape(3,3)
+T = np.array([ -5.3060682373153902e+00, -2.0313336192718401e-01, -2.5629857299114900e-01 ]).reshape(3,1)
+
+def rectify_undistort(img1):
+    """rectification"""
+    R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
+        mtx1, dist1,
+        mtx2, dist2,
+        (1920,1080),
+        R,
+        T,
+        flags=cv2.CALIB_ZERO_DISPARITY,
+        alpha=0,
+        newImageSize=(1920,1080)
+    )
+    map11,map12 = cv2.initUndistortRectifyMap(mtx1,dist1,R1,P1,(1920,1080),cv2.CV_16SC2)
+    map21,map22 = cv2.initUndistortRectifyMap(mtx2,dist2,R2,P2,(1920,1080),cv2.CV_16SC2)
+    img1r = cv2.remap(img1, map11, map12, cv2.INTER_LINEAR)
+    #img2r = cv2.remap(img2, map21, map22, cv2.INTER_LINEAR)
+    return img1r
+
+
 def predict_single_image(image, sess, inputs, outputs, dlc_cfg):
     """
     Returns pose for one single image
@@ -220,6 +256,7 @@ class image_converter:
     try:
       self.cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
       #temp_image = copy.deepcopy(self.cv_image)
+      self.cv_image = rectify_undistort(self.cv_image)
       temp_image = cv2.resize(self.cv_image, REQUIRED_DIM)
     except CvBridgeError as e:
       print(e)
@@ -235,18 +272,8 @@ class image_converter:
            print("Prediction ongoing, returning previous image")
            return 
 
-    #points_predicted =  self.modify_points_predicted(points_predicted)
-    # convert prediction to ros pose array
-#     ps = PoseArray()
-#     ps.header.frame_id = "/base_link"
-#     ps.header.stamp = data.header.stamp
-#     for i in range(points_predicted.shape[0]):
-#        pose = Pose()
-#        pose.position.x = points_predicted[i,0]
-#        pose.position.y = points_predicted[i,1]
-#        pose.position.z = scores[i]
-#        ps.poses.append( pose )
-
+    points_predicted = self.modify_points_predicted(points_predicted)
+    
     # convert prediction to ros pose array
     ps = JointState()
     ps.header.stamp = data.header.stamp
@@ -255,7 +282,8 @@ class image_converter:
     ps.position = list(points_predicted[:,0]) # x coordinates
     ps.velocity = list(points_predicted[:,1]) # y coordinates
     
-    temp_pub_img = self.overwrite_image(temp_image,points_predicted,scores) 
+    temp_pub_img = self.overwrite_image(self.cv_image, points_predicted,scores) 
+    
     # PUBLISH 
     self.pose_pub.publish(ps)
     try:
