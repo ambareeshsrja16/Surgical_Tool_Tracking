@@ -121,4 +121,10 @@ RUN /bin/bash -c "source /opt/ros/kinetic/setup.bash && \
 RUN /bin/bash -c "echo 'source /opt/ros/kinetic/setup.bash' >> ~/.bashrc"
 RUN /bin/bash -c "echo 'source ~/DLCROS_ws/install/setup.bash --extend' >> ~/.bashrc"
 
+RUN /bin/bash -c "rm -rf '/opt/ros/kinetic/lib/python2.7/dist-packages/cv2.so' >> ~/.bashrc"
+
+RUN pip uninstall numpy
+RUN pip install numpy == 1.17.0
+
+
 CMD ["bash"]
