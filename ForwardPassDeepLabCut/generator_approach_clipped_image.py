@@ -248,7 +248,7 @@ class image_converter:
   def __init__(self, generator):
     self.image_pub = rospy.Publisher("/dlc_prediction_topic", Image)
     self.bridge = CvBridge()
-    self.image_sub = rospy.Subscriber("/stereo/slave/left/image", Image, self.callback)
+    self.image_sub = rospy.Subscriber("/stereo/rectified/left/image", Image, self.callback)
     self.generator = generator
     self.pose_pub = rospy.Publisher("/dlc_pose_array", JointState)
 
@@ -281,6 +281,7 @@ class image_converter:
     ps.name = ['roll_1', 'roll_2', 'pitch_1', 'pitch_3', 'pitch_2','yaw_1','yaw_2']
     ps.position = list(points_predicted[:,0]) # x coordinates
     ps.velocity = list(points_predicted[:,1]) # y coordinates
+    ps.effort = scores
     
     temp_pub_img = self.overwrite_image(self.cv_image, points_predicted,scores) 
     
